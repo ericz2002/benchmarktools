@@ -8,8 +8,9 @@ int has_common_factor(int number1, int number2);
 
 void *phi_function(void *);
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
-int out = 0;
+volatile int out = 0;
 int NTHREADS,inp;
+volatile int counter=0;
 
 int main(int argc, char *argv[])
 {
@@ -31,12 +32,19 @@ int main(int argc, char *argv[])
     //pthread_t thread_id[NTHREADS];
     pthread_t *thread_id;
     thread_id = (pthread_t *)malloc(sizeof(pthread_t) * NTHREADS);
-    int i, j, arg;
-
+    int i, j, interval;
+    int *arg;
+    interval = inp / NTHREADS;
     for (i = 0; i < NTHREADS; i++)
     {
-        arg = i * inp / NTHREADS + 1;
-        pthread_create(&thread_id[i], NULL, phi_function, (void *)&arg);
+	arg = (int *) malloc(sizeof(int) * 2);
+        arg[0] = i * interval + 1;
+	if (i==NTHREADS-1) {
+		arg[1] = inp;
+	} else {
+		arg[1] = arg[0] + inp / NTHREADS;
+	}
+        pthread_create(&thread_id[i], NULL, phi_function, (void *)arg);
     }
 
     for (j = 0; j < NTHREADS; j++)
@@ -49,31 +57,22 @@ int main(int argc, char *argv[])
 
 void *phi_function(void *ptr)
 {
-    printf("threadid: %ld\n",pthread_self());
     int i;
-    int *min;
-    min = (int *)ptr;
-    FILE *fptr;
-    sleep(*min);
-    char filename[100];
-    sprintf(filename,"output%d", *min);
-
-    fptr = fopen(filename,"w");
-
-    for (i = *min; i < *min + inp / NTHREADS; i++)
+    int min, max;
+    min = *(int *)ptr;
+    max = *((int *)ptr + 1);
+    for (i = min; i < max; i++)
     {
-        int j;
 
         if (has_common_factor(i, inp) == 0) {
             pthread_mutex_lock(&mutex1);
             out++;
-            printf("i = %d\n",i);
             pthread_mutex_unlock(&mutex1);
-            fprintf(fptr,"i = %d\n",i);
-
         }
-    }
-    fclose(fptr);
+    pthread_mutex_lock(&mutex1);
+    counter++;
+    pthread_mutex_unlock(&mutex1);
+   }
 }
 
 int has_common_factor(int number1, int number2) {
